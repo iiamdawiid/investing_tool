@@ -1,65 +1,73 @@
+import textwrap
 from colorama import Fore, Style
+from s_functions import display_quit_message, get_ag_vars
 
 
 def start_menu():
-    print("""
-        =====================
-            STOCK MONITOR
-        =====================
-    """)
     while True:
-        try:
-            user_choice = int(
-                input(
-                    f"{Fore.GREEN}[1] Stock Menu{Style.RESET_ALL}\n{Fore.YELLOW}[2] Crypto Menu{Style.RESET_ALL}\nEnter choice: "
+        print(textwrap.dedent("""
+            =====================
+                STOCK MONITOR
+            =====================
+            """), end="")
+        while True:
+            try:
+                user_choice = int(
+                    input(
+                        f"{Fore.RED}[0] Quit{Style.RESET_ALL}\n{Fore.GREEN}[1] Stock Menu{Style.RESET_ALL}\n{Fore.YELLOW}[2] Crypto Menu{Style.RESET_ALL}\nEnter choice: "
+                    )
                 )
-            )
-            if user_choice not in {1, 2}:
-                print(f"{Fore.RED}ERROR: Please enter 1 or 2{Style.RESET_ALL}")
-            else:
-                break
-        except Exception as e:
-            print(f"{Fore.RED}ERROR: {e}{Style.RESET_ALL}")
+                if user_choice not in {0, 1, 2}:
+                    print(f"\n{Fore.RED}ERROR: Please enter an integer (0-3){Style.RESET_ALL}\n")
+                else:
+                    break
 
-    if user_choice == 1:
-        stock_menu()
-    else:
-        crypto_menu()
+            except Exception as e:
+                print(f"\n{Fore.RED}ERROR: {e}{Style.RESET_ALL}\n")
+
+        if user_choice == 1:
+            stock_menu()
+        elif user_choice == 2:
+            crypto_menu()
+        else:
+            display_quit_message()
 
 
 def stock_menu():
-    print("""
-        ==================
-            STOCK MENU
-        ==================
-    """)
+    print(textwrap.dedent("""
+          ==================
+              STOCK MENU
+          ==================
+        """), end="")
     while True:
         try:
             user_choice = int(
                 input(
-                    f"{Fore.RED}[1] Aggregates (Bars){Style.RESET_ALL}\n{Fore.YELLOW}[2] Daily Open/Close{Style.RESET_ALL}\n{Fore.GREEN}[3] Investment Growth Calculator{Style.RESET_ALL}\nEnter choice: "
+                    f"{Fore.RED}[0] Quit{Style.RESET_ALL}\n{Fore.BLUE}[1] Candlesticks{Style.RESET_ALL}\n{Fore.YELLOW}[2] Daily Open/Close{Style.RESET_ALL}\n{Fore.GREEN}[3] Investment Growth Calculator{Style.RESET_ALL}\nEnter choice: "
                 )
             )
-            if user_choice not in {1, 2, 3}:
-                print(f"{Fore.RED}ERROR: Please enter a number (1-3){Style.RESET_ALL}")
+            if user_choice not in {0, 1, 2, 3}:
+                print(f"\n{Fore.RED}ERROR: Please enter a number (1-3){Style.RESET_ALL}\n")
             else:
                 break
+
         except Exception as e:
-            print(f"ERROR: {e}")
+            print(f"\n{Fore.RED}ERROR: {e}{Style.RESET_ALL}\n")
     # to be continued
     match user_choice:
-        case 1: ... # figure out logic and plan out functions needed
-        case 2: ... # same as above
-        case 3: ... # ^
-        case 4: ... # ^
+        case 0: display_quit_message()
+        case 1: get_ag_vars()
+        case 2: ...
+        case 3: ... 
+        case 4: ... 
 
 
 def crypto_menu():
-    print("""
-        ===================
-            CRYPTO MENU
-        ===================
-    """)
+    print(textwrap.dedent("""
+          ======================
+              CRYPTO MONITOR
+          ======================
+        """), end="")
     user_choice = input(
         f"{Fore.RED}[1] Aggregates (Bars){Style.RESET_ALL}\n{Fore.YELLOW}[2] Daily Open/Close{Style.RESET_ALL}\n{Fore.GREEN}[3] Investment Growth Calculator{Style.RESET_ALL}\nEnter choice: "
     )
