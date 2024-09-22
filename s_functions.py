@@ -1,10 +1,11 @@
 import os
 import re
 import sys
+import json
 import mplfinance as mf
 import pandas as pd
 import textwrap
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 import requests
 from colorama import Fore, Style
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ def validate_date(date):
     pattern = r"^\d{4}-\d{2}-\d{2}$"
     return re.match(pattern, date)
 
-
+# ==================== CANDLESTICKS ====================
 def get_ag_vars():
     print(
         textwrap.dedent(
@@ -71,7 +72,7 @@ def get_ag_vars():
         get_ag_data(stocks_ticker, timespan, date_from, date_to, multiplier)
 
     except Exception as e:
-        print(f"{Fore.RED}ERROR: {e}{Style.RESET_ALL}")
+        print(f"\n{Fore.RED}ERROR: {e}{Style.RESET_ALL}\n")
 
 
 def get_ag_data(stocks_ticker, timespan, date_from, date_to, multiplier=1):
@@ -95,40 +96,28 @@ def get_ag_data(stocks_ticker, timespan, date_from, date_to, multiplier=1):
         data = response.json()
 
         if data.get("status") == "NOT FOUND":
-            print(f"\n{Fore.RED}ERROR: {data['message']}{Style.RESET_ALL}\n")
+            raise Exception(f"\n{Fore.RED}ERROR: {data['message']}{Style.RESET_ALL}\n")
 
     except requests.exceptions.RequestException as e:
         print(f"\n{Fore.RED}ERROR: {e}{Style.RESET_ALL}\n")
 
-    display_ag_data(data["results"], date_from, date_to)
+    dataframe_fmt(data["results"])
 
 
-def display_ag_data(c, date_from, date_to):
-    # display data as candlesticks on bar chart
-    dates = []
+def dataframe_fmt(c):
     open = []
     high = []
     low = []
     close = []
     volume = []
-    vwp = []
-    num_trades = []
+    dates = [datetime.fromtimestamp(candle["t"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d") for candle in c]
 
-    for i in range(0, len(c)):
-        open.append(c[i]["o"])
-        high.append(c[i]["h"])
-        low.append(c[i]["l"])
-        close.append(c[i]["c"])
-        volume.append(c[i]["v"])
-        vwp.append(c[i]["vw"])
-        num_trades.append(c[i]["n"])
-
-    date1 = datetime.strptime(date_from, "%Y-%m-%d")
-    date2 = datetime.strptime(date_to, "%Y-%m-%d")
-    current_date = date1
-    while current_date <= date2:
-        dates.append(current_date.strftime("%Y-%m-%d"))
-        current_date += timedelta(days=1) # increments day by 1
+    for candle in c:
+        open.append(candle["o"])
+        high.append(candle["h"])
+        low.append(candle["l"])
+        close.append(candle["c"])
+        volume.append(candle["v"])
 
     data = {
         "Date": dates,
@@ -139,6 +128,10 @@ def display_ag_data(c, date_from, date_to):
         "Volume": volume
     }
 
+    display_ag_data(data)
+
+
+def display_ag_data(data):
     df = pd.DataFrame(data)
     df["Date"] = pd.to_datetime(df["Date"])
     df.set_index("Date", inplace=True)
@@ -148,3 +141,5 @@ def display_ag_data(c, date_from, date_to):
     restart = input(f"\n{Fore.GREEN}[C] CONTINUE{Style.RESET_ALL}\n{Fore.RED}[Q] QUIT{Style.RESET_ALL}\nEnter choice: ").upper()
     if restart == 'Q':
         display_quit_message()
+
+# ==================== DAILY OPEN/CLOSE ====================
