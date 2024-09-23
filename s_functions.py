@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+from tabulate import tabulate
 import mplfinance as mf
 import pandas as pd
 import textwrap
@@ -23,20 +24,32 @@ def validate_date(date):
     pattern = r"^\d{4}-\d{2}-\d{2}$"
     return re.match(pattern, date)
 
+
 # ==================== CANDLESTICKS ====================
 def get_ag_vars():
     print(
         textwrap.dedent(
-        """
+            """
           ====================
               CANDLESTICKS
           ====================
         """
-        ), end="")
+        ),
+        end="",
+    )
     print(
         f"{Fore.YELLOW}Please enter the following data to receive candlesticks...{Style.RESET_ALL}"
     )
-    timespan_options = {"second", "minute", "hour", "day", "week", "month", "quarter", "year"}
+    timespan_options = {
+        "second",
+        "minute",
+        "hour",
+        "day",
+        "week",
+        "month",
+        "quarter",
+        "year",
+    }
     try:
         stocks_ticker = input("Stocks ticker: ")
         while True:
@@ -44,28 +57,38 @@ def get_ag_vars():
                 multiplier = int(input("Multiplier (default=1): "))
                 break
             except ValueError:
-                print(f"\n{Fore.RED}ERROR: Multiplier must be an integer{Style.RESET_ALL}\n")
-        
+                print(
+                    f"\n{Fore.RED}ERROR: Multiplier must be an integer{Style.RESET_ALL}\n"
+                )
+
         timespan = input("Candlestick timespan: ").lower()
         while timespan not in timespan_options:
-            print(f"\n{Fore.RED}ERROR: Enter a valid timespan: ({', '.join(timespan_options)}){Style.RESET_ALL}\n")
+            print(
+                f"\n{Fore.RED}ERROR: Enter a valid timespan: ({', '.join(timespan_options)}){Style.RESET_ALL}\n"
+            )
             timespan = input("Candlestick timespan: ").lower()
 
         while True:
             date_from = input("From (YYYY-MM-DD): ")
             while not validate_date(date_from):
-                print(f"\n{Fore.RED}ERROR: Date must be in format: {Fore.YELLOW}YYYY-MM-DD{Style.RESET_ALL}\n")
+                print(
+                    f"\n{Fore.RED}ERROR: Date must be in format: {Fore.YELLOW}YYYY-MM-DD{Style.RESET_ALL}\n"
+                )
                 date_from = input("From (YYYY-MM-DD): ")
 
             date_to = input("Till (YYYY-MM-DD): ")
             while not validate_date(date_to):
-                print(f"\n{Fore.RED}ERROR: Date must be in format: {Fore.YELLOW}YYYY-MM-DD{Style.RESET_ALL}\n")
+                print(
+                    f"\n{Fore.RED}ERROR: Date must be in format: {Fore.YELLOW}YYYY-MM-DD{Style.RESET_ALL}\n"
+                )
                 date_to = input("To (YYYY-MM-DD): ")
 
             date1 = datetime.strptime(date_from, "%Y-%m-%d")
             date2 = datetime.strptime(date_to, "%Y-%m-%d")
             if date1 > date2:
-                print(f"\n{Fore.RED}ERROR: First date can not exceed second date{Style.RESET_ALL}\n")
+                print(
+                    f"\n{Fore.RED}ERROR: First date can not exceed second date{Style.RESET_ALL}\n"
+                )
             else:
                 break
 
@@ -77,18 +100,22 @@ def get_ag_vars():
 
 def get_ag_data(stocks_ticker, timespan, date_from, date_to, multiplier=1):
     # send received vars to API and get data
-    BARS_API_URL = textwrap.dedent(
-        """
+    BARS_API_URL = (
+        textwrap.dedent(
+            """
             https://api.polygon.io/v2/aggs/ticker/{stocks_ticker}/range/{multiplier}/{timespan}/{date_from}/{date_to}?adjusted=true&sort=asc&apiKey={API_KEY}
         """
-    ).format(
-        stocks_ticker=stocks_ticker,
-        multiplier=multiplier,
-        timespan=timespan,
-        date_from=date_from,
-        date_to=date_to,
-        API_KEY=API_KEY
-    ).strip()
+        )
+        .format(
+            stocks_ticker=stocks_ticker,
+            multiplier=multiplier,
+            timespan=timespan,
+            date_from=date_from,
+            date_to=date_to,
+            API_KEY=API_KEY,
+        )
+        .strip()
+    )
 
     try:
         response = requests.get(BARS_API_URL)
@@ -110,7 +137,10 @@ def dataframe_fmt(c):
     low = []
     close = []
     volume = []
-    dates = [datetime.fromtimestamp(candle["t"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d") for candle in c]
+    dates = [
+        datetime.fromtimestamp(candle["t"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        for candle in c
+    ]
 
     for candle in c:
         open.append(candle["o"])
@@ -125,7 +155,7 @@ def dataframe_fmt(c):
         "High": high,
         "Low": low,
         "Close": close,
-        "Volume": volume
+        "Volume": volume,
     }
 
     display_ag_data(data)
@@ -138,8 +168,106 @@ def display_ag_data(data):
 
     mf.plot(df, type="candle", volume=True, style="yahoo", figscale=1.5)
 
-    restart = input(f"\n{Fore.GREEN}[C] CONTINUE{Style.RESET_ALL}\n{Fore.RED}[Q] QUIT{Style.RESET_ALL}\nEnter choice: ").upper()
-    if restart == 'Q':
+    restart = input(
+        f"\n{Fore.GREEN}[C] CONTINUE{Style.RESET_ALL}\n{Fore.RED}[Q] QUIT{Style.RESET_ALL}\nEnter choice: "
+    ).upper()
+    if restart == "Q":
         display_quit_message()
 
+
 # ==================== DAILY OPEN/CLOSE ====================
+def get_oc_vars():
+    print(
+        textwrap.dedent(
+            """
+          ====================
+              CANDLESTICKS
+          ====================
+        """
+        ),
+        end="",
+    )
+    print(
+        f"{Fore.YELLOW}Please enter the following data to receive Daily Open/Close data...{Style.RESET_ALL}"
+    )
+    try:
+        stocks_ticker = input("Stocks ticker: ")
+        while True:
+            date = input("Date (YYYY-MM-DD): ")
+            current_date = datetime.strptime(date, "%Y-%m-%d")
+            if current_date > datetime.now():
+                print(
+                    f"\n{Fore.RED}ERROR: Date can not be in the future{Style.RESET_ALL}\n"
+                )
+                continue
+            else:
+                while not validate_date(date):
+                    print(
+                        f"\n{Fore.RED}ERROR: Date must be in format: {Fore.YELLOW}YYYY-MM-DD{Style.RESET_ALL}\n"
+                    )
+                    date = input("Date (YYYY-MM-DD): ")
+                break
+
+        get_oc_data(stocks_ticker, date)
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+
+
+def get_oc_data(stocks_ticker, date):
+    OC_API_URL = (
+        textwrap.dedent(
+            """
+            https://api.polygon.io/v1/open-close/{stocks_ticker}/{date}?adjusted=true&apiKey={API_KEY}
+        """
+        )
+        .format(stocks_ticker=stocks_ticker, date=date, API_KEY=API_KEY)
+        .strip()
+    )
+
+    try:
+        response = requests.get(OC_API_URL)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("status") == "NOT FOUND":
+            raise Exception(f"\n{Fore.RED}ERROR: {data['message']}{Style.RESET_ALL}\n")
+
+    except requests.exceptions.RequestException as e:
+        print(f"\n{Fore.RED}ERROR: {e}{Style.RESET_ALL}\n")
+
+    fmt_display_table(data)
+
+
+def fmt_display_table(data):
+    date, symbol, premarket, open, high, low, close, afterhours, volume = (
+        data["from"],
+        data["symbol"],
+        data["preMarket"],
+        data["open"],
+        data["high"],
+        data["low"],
+        data["close"],
+        data["afterHours"],
+        data["volume"],
+    )
+    table = [
+        ["Date", date],
+        ["Symbol", symbol],
+        ["Pre-Market", premarket],
+        ["Open", open],
+        ["High", high],
+        ["Low", low],
+        ["Close", close],
+        ["After-Hours", afterhours],
+        ["Volume", volume],
+    ]
+
+    display_oc_data(table)
+
+
+def display_oc_data(table):
+    print(tabulate(table, tablefmt="grid"))
+
+
+# ==================== INVESTMENT GROWTH CALCULATOR ====================
