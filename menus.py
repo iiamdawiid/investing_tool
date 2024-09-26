@@ -1,6 +1,6 @@
 import textwrap
 from colorama import Fore, Style
-from s_functions import display_quit_message, get_ag_vars, get_oc_vars
+from s_functions import display_quit_message, get_ag_vars, get_oc_vars, get_growth_vars
 
 
 def start_menu():
@@ -76,9 +76,7 @@ def stock_menu():
         case 2:
             get_oc_vars()
         case 3:
-            ...
-        case 4:
-            ...
+            get_growth_vars()
 
 
 def crypto_menu():

@@ -1,12 +1,11 @@
 import os
 import re
 import sys
-import json
 from tabulate import tabulate
 import mplfinance as mf
 import pandas as pd
 import textwrap
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 from colorama import Fore, Style
 from dotenv import load_dotenv
@@ -180,9 +179,9 @@ def get_oc_vars():
     print(
         textwrap.dedent(
             """
-          ====================
-              CANDLESTICKS
-          ====================
+          ========================
+              DAILY OPEN/CLOSE
+          ========================
         """
         ),
         end="",
@@ -214,7 +213,7 @@ def get_oc_vars():
         print(f"ERROR: {e}")
 
 
-def get_oc_data(stocks_ticker, date):
+def get_oc_data(stocks_ticker, date, growth=False):
     OC_API_URL = (
         textwrap.dedent(
             """
@@ -236,7 +235,14 @@ def get_oc_data(stocks_ticker, date):
     except requests.exceptions.RequestException as e:
         print(f"\n{Fore.RED}ERROR: {e}{Style.RESET_ALL}\n")
 
-    fmt_display_table(data)
+    # if this function is called from growth calculator, return instead of display
+    if growth:
+        if data:
+            return data["close"]
+        else:
+            return ""
+    else:
+        fmt_display_table(data)
 
 
 def fmt_display_table(data):
@@ -271,3 +277,174 @@ def display_oc_data(table):
 
 
 # ==================== INVESTMENT GROWTH CALCULATOR ====================
+def is_holiday(date):
+    user_date = datetime.strptime(date, "%Y-%m-%d")
+    year = user_date.year
+    MARKET_HOLIDAYS = [
+        f"{year}-01-01",
+        f"{year}-01-15",
+        f"{year}-02-20",
+        f"{year}-04-07",
+        f"{year}-05-29",
+        f"{year}-06-19",
+        f"{year}-07-04",
+        f"{year}-09-04",
+        f"{year}-11-23",
+        f"{year}-11-24",
+        f"{year}-12-25",
+    ]
+    return not date in MARKET_HOLIDAYS
+
+
+def is_market_open(date):
+    user_date = datetime.strptime(date, "%Y-%m-%d")
+    if user_date.weekday() >= 5:
+        return False
+    return True
+
+
+def get_growth_vars():
+    print(
+        textwrap.dedent(
+            """
+          =========================
+              GROWTH CALCULATOR
+          =========================
+        """
+        ),
+        end="",
+    )
+    print(
+        f"{Fore.YELLOW}Please enter the following data to calculate growth...{Style.RESET_ALL}"
+    )
+    try:
+        while True:
+            past_date = input("Past date: ")
+            if validate_date(past_date):
+                # break
+                if is_market_open(past_date):
+                    if is_holiday(past_date):
+                        break
+                    else:
+                        print(
+                            f"\n{Fore.RED}ERROR: Date can not be holiday{Style.RESET_ALL}\n"
+                        )
+                else:
+                    print(
+                        f"\n{Fore.RED}ERROR: Must be valid trading day{Style.RESET_ALL}\n"
+                    )
+            else:
+                print(
+                    f"\n{Fore.RED}ERROR: Date must be in YYYY-MM-DD format{Style.RESET_ALL}\n"
+                )
+
+        stock_ticker = input("Stock ticker: ")
+
+        while True:
+            try:
+                itl_inv = float(input("Investment amount: "))
+                if itl_inv < 0:
+                    print(
+                        f"\n{Fore.RED}ERROR: Investment must be greater than 0{Style.RESET_ALL}\n"
+                    )
+                else:
+                    break
+
+            except ValueError:
+                print(f"{Fore.RED}ERROR: Please enter a number{Style.RESET_ALL}\n")
+
+    except Exception as e:
+        print(f"{Fore.RED}ERROR: {e}{Style.RESET_ALL}")
+
+    current_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    past_price = float(get_oc_data(stock_ticker, past_date, growth=True))
+    current_price = float(get_oc_data(stock_ticker, current_date, growth=True))
+
+    amt_growth, pct_growth, current_value = calculate_growth(
+        itl_inv, past_price, current_price
+    )
+    # build function to color specific parts of table
+    stock_ticker, past_date, past_price, current_date, current_price, itl_inv = (
+        colorfmt_table(
+            stock_ticker, past_date, past_price, current_date, current_price, itl_inv
+        )
+    )
+    # call function to format for display
+    fmt_growth_table = fmt_growth_table_display(
+        stock_ticker,
+        past_date,
+        past_price,
+        current_date,
+        current_price,
+        amt_growth,
+        pct_growth,
+        current_value,
+        itl_inv,
+    )
+    display_growth(fmt_growth_table)
+
+
+def calculate_growth(itl_inv, past_price, current_price):
+    num_shares = itl_inv / past_price
+
+    current_value = num_shares * current_price
+    fmt_current_value = f"{current_value:,.2f}"
+    past_value = num_shares * past_price
+
+    amt_growth = current_value - itl_inv
+    fmt_amt_growth = f"{amt_growth:,.2f}"
+    pct_growth = (current_value / itl_inv) * 100
+    fmt_pct_growth = f"{pct_growth:,.2f}"
+    if amt_growth < 0:
+        amt_growth = f"{Fore.RED}- ${fmt_amt_growth}{Style.RESET_ALL}"
+        pct_growth = f"{Fore.RED}- %{fmt_pct_growth}{Style.RESET_ALL}"
+    else:
+        amt_growth = f"{Fore.GREEN}+ ${fmt_amt_growth}{Style.RESET_ALL}"
+        pct_growth = f"{Fore.GREEN}+ %{fmt_pct_growth}{Style.RESET_ALL}"
+
+    if current_value < past_value:
+        current_value = f"{Fore.RED}${fmt_current_value}{Style.RESET_ALL}"
+    else:
+        current_value = f"{Fore.GREEN}${fmt_current_value}{Style.RESET_ALL}"
+
+    return amt_growth, pct_growth, current_value
+
+
+def colorfmt_table(
+    stock_ticker, past_date, past_price, current_date, current_price, itl_inv
+):
+    stock_ticker = f"{Fore.GREEN}{stock_ticker}{Style.RESET_ALL}"
+    past_date = f"{Fore.YELLOW}{past_date}{Style.RESET_ALL}"
+    fmt_past_price = f"{past_price:,.2f}"
+    past_price = f"{Fore.YELLOW}${fmt_past_price}{Style.RESET_ALL}"
+    current_date = f"{Fore.GREEN}{current_date}{Style.RESET_ALL}"
+    fmt_current_price = f"{current_price:,.2f}"
+    current_price = f"{Fore.GREEN}${fmt_current_price}{Style.RESET_ALL}"
+    fmt_itl_inv = f"{itl_inv:,.2f}"
+    itl_inv = f"{Fore.YELLOW}${fmt_itl_inv}{Style.RESET_ALL}"
+
+    return stock_ticker, past_date, past_price, current_date, current_price, itl_inv
+
+
+def fmt_growth_table_display(
+    stock_ticker,
+    past_date,
+    past_price,
+    current_date,
+    current_price,
+    amt_growth,
+    pct_growth,
+    current_value,
+    itl_inv,
+):
+    table = [
+        [past_date, current_date, current_date],
+        [past_price, current_price, pct_growth],
+        [itl_inv, current_value, amt_growth],
+    ]
+    headers = ["PAST", "CURRENT", f"Δ $ ({stock_ticker})"]
+    return tabulate(table, headers, tablefmt="grid")
+
+
+def display_growth(fmt_growth_table):
+    print(fmt_growth_table)
