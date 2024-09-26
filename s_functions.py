@@ -24,6 +24,41 @@ def validate_date(date):
     return re.match(pattern, date)
 
 
+def is_holiday(date):
+    user_date = datetime.strptime(date, "%Y-%m-%d")
+    year = user_date.year
+    MARKET_HOLIDAYS = [
+        f"{year}-01-01",
+        f"{year}-01-15",
+        f"{year}-02-20",
+        f"{year}-04-07",
+        f"{year}-05-29",
+        f"{year}-06-19",
+        f"{year}-07-04",
+        f"{year}-09-04",
+        f"{year}-11-23",
+        f"{year}-11-24",
+        f"{year}-12-25",
+    ]
+    return not date in MARKET_HOLIDAYS
+
+
+def is_market_open(date):
+    user_date = datetime.strptime(date, "%Y-%m-%d")
+    if user_date.weekday() >= 5:
+        return False
+    return True
+
+
+def get_valid_trading_day(start_date):
+    date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+    while not is_market_open(date_obj.strftime("%Y-%m-%d")) and is_holiday(date_obj.strftime("%Y-%m-%d")):
+        date_obj -= timedelta(days=1)
+    date_str = date_obj.strftime("%Y-%m-%d")
+    print(f"{Fore.YELLOW}Finding last valid trading date...{Style.RESET_ALL} : {Fore.GREEN}{date_str}{Style.RESET_ALL}")
+    return date_str
+
+
 # ==================== CANDLESTICKS ====================
 def get_ag_vars():
     print(
@@ -214,6 +249,8 @@ def get_oc_vars():
 
 
 def get_oc_data(stocks_ticker, date, growth=False):
+    data = None
+
     OC_API_URL = (
         textwrap.dedent(
             """
@@ -240,7 +277,7 @@ def get_oc_data(stocks_ticker, date, growth=False):
         if data:
             return data["close"]
         else:
-            return ""
+            return False
     else:
         fmt_display_table(data)
 
@@ -277,32 +314,6 @@ def display_oc_data(table):
 
 
 # ==================== INVESTMENT GROWTH CALCULATOR ====================
-def is_holiday(date):
-    user_date = datetime.strptime(date, "%Y-%m-%d")
-    year = user_date.year
-    MARKET_HOLIDAYS = [
-        f"{year}-01-01",
-        f"{year}-01-15",
-        f"{year}-02-20",
-        f"{year}-04-07",
-        f"{year}-05-29",
-        f"{year}-06-19",
-        f"{year}-07-04",
-        f"{year}-09-04",
-        f"{year}-11-23",
-        f"{year}-11-24",
-        f"{year}-12-25",
-    ]
-    return not date in MARKET_HOLIDAYS
-
-
-def is_market_open(date):
-    user_date = datetime.strptime(date, "%Y-%m-%d")
-    if user_date.weekday() >= 5:
-        return False
-    return True
-
-
 def get_growth_vars():
     print(
         textwrap.dedent(
@@ -331,8 +342,10 @@ def get_growth_vars():
                         )
                 else:
                     print(
-                        f"\n{Fore.RED}ERROR: Must be valid trading day{Style.RESET_ALL}\n"
+                        f"\n{Fore.RED}ERROR: Must be valid trading day{Style.RESET_ALL}"
                     )
+                    past_date = get_valid_trading_day(past_date) # find last valid trading day
+                    break
             else:
                 print(
                     f"\n{Fore.RED}ERROR: Date must be in YYYY-MM-DD format{Style.RESET_ALL}\n"
@@ -357,8 +370,22 @@ def get_growth_vars():
         print(f"{Fore.RED}ERROR: {e}{Style.RESET_ALL}")
 
     current_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    past_price = float(get_oc_data(stock_ticker, past_date, growth=True))
-    current_price = float(get_oc_data(stock_ticker, current_date, growth=True))
+    if not is_market_open(current_date): # find last valid trading day
+        current_date = get_valid_trading_day(current_date)
+
+    past_price = get_oc_data(stock_ticker, past_date, growth=True)
+    if past_price == False:
+        print(f"\n{Fore.RED}ERROR: Date must be within 2 years of today{Style.RESET_ALL}\n")
+        return
+    else:
+        past_price = float(past_price)
+
+    current_price = get_oc_data(stock_ticker, current_date, growth=True)
+    if current_price == False:
+        print(f"\n{Fore.RED}ERROR: No data for current date{Style.RESET_ALL}{Style.RESET_ALL}\n")
+        return
+    else:
+        current_price = float(current_price)
 
     amt_growth, pct_growth, current_value = calculate_growth(
         itl_inv, past_price, current_price
